@@ -7,6 +7,8 @@ analysts. Select a file in Finder, and HashHound looks it up by hash across **Vi
 **MalwareBazaar**, **REDS**, **urlscan.io**, and **Hybrid Analysis** at once, then shows a single,
 glanceable verdict with the detail to dig deeper. No copy‑pasting hashes into several websites.
 
+**[⬇️  Download the latest release](https://github.com/forensicdave/hashhound/releases/latest)** — macOS 14+, notarized.
+
 ---
 
 ## Why analysts like it
