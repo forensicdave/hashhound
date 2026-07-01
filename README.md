@@ -4,8 +4,8 @@
 
 HashHound is a native macOS utility for security researchers, incident responders, and malware
 analysts. Select a file in Finder, and HashHound looks it up by hash across **VirusTotal**,
-**MalwareBazaar**, **REDS**, **urlscan.io**, and **Hybrid Analysis** at once, then shows a single,
-glanceable verdict with the detail to dig deeper. No copy‑pasting hashes into several websites.
+**MalwareBazaar**, **REDS**, **urlscan.io**, **Hybrid Analysis**, and **Team Cymru MHR** at once,
+then shows a single, glanceable verdict with the detail to dig deeper. No copy‑pasting hashes.
 
 **[⬇️  Download the latest release](https://github.com/forensicdave/hashhound/releases/latest)** — macOS 14+, notarized.
 
@@ -49,8 +49,9 @@ right‑click.
   (e.g. `VirusTotal 3/72 · MalwareBazaar known · REDS not in dataset`).
 - **Expandable detail** — each source is collapsible (use **Expand All / Collapse All**, or click a
   source). VirusTotal's flagged engines and detection ratio, MalwareBazaar's signature/tags,
-  REDS's **risk level** and analysis, urlscan.io's referencing URLs, and Hybrid Analysis's verdict
-  + threat score — each with a link to the full report online.
+  REDS's **risk level** and analysis, urlscan.io's referencing URLs, Hybrid Analysis's verdict
+  + threat score, and Team Cymru MHR's **AV detection rate** + last‑seen date — each with a link
+  to the full report online where available.
 - **Accurate "not seen" handling** — MalwareBazaar and REDS are *malware* datasets, so a miss means
   "not a known sample," **not** "clean." HashHound never mislabels that as safe. urlscan.io is
   context (where the file was seen online), not a malware verdict.
@@ -114,6 +115,7 @@ right‑click.
 | **REDS** (RationalEdge DataSet) | Malware dataset with code/feature analysis; status, file type, collections | ZIP (raw fallback) | Upload (private option) |
 | **urlscan.io** (Files search) | Where the file has been seen online — the URLs/scans that referenced it (context, not a verdict) | — | — |
 | **Hybrid Analysis** (Falcon Sandbox) | Sandbox verdict (malicious/suspicious/clean) + 0–100 threat score, file type, AV scanners, tags | — | Submit for sandbox analysis |
+| **Team Cymru MHR** (Malware Hash Registry) | Registry of known‑malware hashes with an AV detection % and last‑seen date | — | — |
 
 You choose which sources to enable. Each is independent — HashHound works fine with just one.
 
@@ -128,6 +130,9 @@ You choose which sources to enable. Each is independent — HashHound works fine
   - **REDS** — <https://reds.rationaledge.io/> — access may not be free; contact RationalEdge to request access
   - **urlscan.io** — <https://urlscan.io/user/apikey/> — Files (hash) search requires a **paid** urlscan.io plan
   - **Hybrid Analysis** (Falcon Sandbox) (free) — <https://hybrid-analysis.com/my-account?tab=%23api-key-tab>
+  - **Team Cymru MHR** (free) — sign up at <https://www.team-cymru.com/mhr> to get a **username and
+    password**, then enter both under **Settings → Team Cymru MHR** and click **Test**. (MHR uses
+    HTTP Basic auth — a username and password — not a single API key.)
 
 ---
 
@@ -155,7 +160,7 @@ That's it — right‑click a file in Finder and choose **Lookup in HashHound**.
   Download). History stays until you press **Clear**.
 - **Quotas:** *File → Service Quotas…*.
 - **Settings (⌘,):** keys, rate limit, external‑program command + helper app, **AI** prompt/site +
-  paste‑size warning, raw‑download toggle, and debug logging.
+  paste‑size warning, **command‑line‑tool install**, raw‑download toggle, and debug logging.
 
 ### A good first test
 
@@ -167,6 +172,51 @@ recognizes — ideal for confirming your keys work and seeing the sources light 
 ```
 
 Use **File → Look Up Hashes…**, paste it, and press **⌘Return**.
+
+---
+
+## Command line (`hashhound`)
+
+HashHound bundles a `hashhound` command‑line tool that uses the same engine and your same API keys,
+and outputs **JSONL** (one JSON object per line) — handy for scripting and pipelines.
+
+**Install it:** **Settings → Command Line Tool → Install Command Line Tool…** (it symlinks
+`hashhound` into `/usr/local/bin`, asking for your admin password only if needed). Then:
+
+```
+hashhound --help
+```
+
+Examples:
+
+```
+# a single hash (MD5 / SHA-1 / SHA-256)
+hashhound 275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f
+
+# one or more files (each hashed locally; a .app uses its executable)
+hashhound /path/to/sample.bin ~/Downloads/suspect.dmg
+
+# a whole directory, recursively, via VirusTotal + Hybrid Analysis only
+hashhound -r --sources virustotal,hybridanalysis ~/quarantine
+
+# a list of hashes piped in, written to a file as well as stdout
+cat hashes.txt | hashhound --stdin -o results.jsonl
+
+# scripting: exit non-zero if anything is malicious
+hashhound --fail-on-malicious *.bin && echo "all clear"
+```
+
+Output defaults to **JSONL**; use `-f/--format markdown` or `-f/--format text` (or the `--markdown` /
+`--text` shortcuts) for a readable report or a compact aligned summary.
+
+Options: `-s/--sources`, `-o/--out`, `-f/--format`, `-r/--recursive`, `--stdin`, `--raw`, `--debug`,
+`--fail-on-malicious`, `-q/--quiet`, `-h/--help`, `--version`. Run `hashhound --help` for the full list.
+
+**API keys:** read from the HashHound Keychain entries (allow access when prompted), or — for
+headless/CI use — from environment variables: `HASHHOUND_VIRUSTOTAL_API_KEY`,
+`HASHHOUND_MALWAREBAZAAR_API_KEY`, `HASHHOUND_REDS_API_KEY`, `HASHHOUND_URLSCAN_API_KEY`,
+`HASHHOUND_HYBRIDANALYSIS_API_KEY`. Team Cymru MHR uses HTTP Basic — set
+`HASHHOUND_CYMRU_API_KEY="username:password"` (or `HASHHOUND_CYMRU_USERNAME` + `HASHHOUND_CYMRU_PASSWORD`).
 
 ---
 
@@ -211,8 +261,8 @@ timestamps, hashes, and request status codes — **never your API keys**.
 ## A note on hash types
 
 SHA‑256 gives the **fullest coverage** — every source supports it. MD5 and SHA‑1 lookups work on
-VirusTotal, MalwareBazaar, urlscan.io, and Hybrid Analysis; **REDS is SHA‑256‑only** and will show
-"Needs SHA‑256" for an MD5/SHA‑1. When in doubt, look up by SHA‑256.
+VirusTotal, MalwareBazaar, urlscan.io, Hybrid Analysis, and Team Cymru MHR; **REDS is SHA‑256‑only**
+and will show "Needs SHA‑256" for an MD5/SHA‑1. When in doubt, look up by SHA‑256.
 
 ---
 
@@ -223,5 +273,5 @@ aid: always corroborate verdicts and handle malware samples responsibly in an is
 
 You supply your **own API keys** and are responsible for using each service within its terms of
 service and rate limits. HashHound is **not affiliated with or endorsed by** VirusTotal,
-MalwareBazaar (abuse.ch), REDS (RationalEdge), urlscan.io, or Hybrid Analysis (CrowdStrike); all
-trademarks belong to their respective owners.
+MalwareBazaar (abuse.ch), REDS (RationalEdge), urlscan.io, Hybrid Analysis (CrowdStrike), or
+Team Cymru; all trademarks belong to their respective owners.
